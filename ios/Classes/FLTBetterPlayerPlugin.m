@@ -61,6 +61,7 @@ int64_t FLTNSTimeIntervalToMillis(NSTimeInterval interval) {
 @property(nonatomic) int stalledCount;
 @property(nonatomic) bool isStalledCheckStarted;
 @property(nonatomic) float playerRate;
+@property(nonatomic) AVPlayerTimeControlStatus lastAvPlayerTimeControlStatus;
 - (void)play;
 - (void)pause;
 - (void)setIsLooping:(bool)isLooping;
@@ -197,6 +198,9 @@ AVPictureInPictureController *_pipController;
             [ self removeObservers];
             
         }
+        [_player pause];
+         _isPlaying = false;
+         _displayLink.paused = YES;
     }
 }
 
@@ -404,6 +408,25 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
                        context:(void*)context {
     
     if ([path isEqualToString:@"rate"]) {
+        if (@available(iOS 10.0, *)) {
+            if (_pipController.pictureInPictureActive == true){
+                if (_lastAvPlayerTimeControlStatus != [NSNull null] && _lastAvPlayerTimeControlStatus == _player.timeControlStatus){
+                    return;
+                }
+                
+                if (_player.timeControlStatus == AVPlayerTimeControlStatusPaused){
+                    _lastAvPlayerTimeControlStatus = _player.timeControlStatus;
+                    _eventSink(@{@"event" : @"pause"});
+                    return;
+                
+                }
+                if (_player.timeControlStatus == AVPlayerTimeControlStatusPlaying){
+                    _lastAvPlayerTimeControlStatus = _player.timeControlStatus;
+                    _eventSink(@{@"event" : @"play"});
+                }
+            }
+        }
+        
         if (_player.rate == 0 && //if player rate dropped to 0
             CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, >, kCMTimeZero) && //if video was started
             CMTIME_COMPARE_INLINE(_player.currentItem.currentTime, <, _player.currentItem.duration) && //but not yet finished
@@ -476,7 +499,6 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
 
 - (void)updatePlayingState {
     if (!_isInitialized || !_key) {
-        NSLog(@"not initalized and paused!!");
         _displayLink.paused = YES;
         return;
     }
@@ -484,6 +506,7 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
         [self addObservers:[_player currentItem]];
     }
     
+
     if (_isPlaying) {
         if (@available(iOS 10.0, *)) {
             [_player playImmediatelyAtRate:1.0];
@@ -968,7 +991,10 @@ NSMutableDictionary*  _artworkImageDict;
 }
 
 - (void) setRemoteCommandsNotificationNotActive{
-    [[AVAudioSession sharedInstance] setActive:false error:nil];
+    if ([_players count] == 0) {
+        [[AVAudioSession sharedInstance] setActive:false error:nil];
+    }
+    
     [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
 }
 
@@ -1178,6 +1204,7 @@ NSMutableDictionary*  _artworkImageDict;
             }
             result(nil);
         } else if ([@"dispose" isEqualToString:call.method]) {
+            [player clear];
             [self disposeNotificationData:player];
             [self setRemoteCommandsNotificationNotActive];
             [_registry unregisterTexture:textureId];
@@ -1198,7 +1225,9 @@ NSMutableDictionary*  _artworkImageDict;
                     [player dispose];
                 }
             });
-            [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
+            if ([_players count] == 0) {
+                [[AVAudioSession sharedInstance] setActive:NO withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation error:nil];
+            }
             result(nil);
         } else if ([@"setLooping" isEqualToString:call.method]) {
             [player setIsLooping:[argsMap[@"looping"] boolValue]];
