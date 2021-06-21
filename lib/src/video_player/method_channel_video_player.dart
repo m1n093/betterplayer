@@ -8,7 +8,9 @@ import 'dart:async';
 import 'dart:ui';
 
 // Flutter imports:
+import 'package:better_player/src/configuration/better_player_buffering_configuration.dart';
 import 'package:better_player/src/core/better_player_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -33,9 +35,28 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   }
 
   @override
-  Future<int?> create() async {
-    final Map<String, dynamic>? response =
-        await _channel.invokeMapMethod<String, dynamic>('create');
+  Future<int?> create({
+    BetterPlayerBufferingConfiguration? bufferingConfiguration,
+  }) async {
+    late final Map<String, dynamic>? response;
+    if (bufferingConfiguration == null) {
+      response = await _channel.invokeMapMethod<String, dynamic>('create');
+    } else {
+      final responseLinkedHashMap = await _channel.invokeMethod<Map?>(
+        'create',
+        <String, dynamic>{
+          'minBufferMs': bufferingConfiguration.minBufferMs,
+          'maxBufferMs': bufferingConfiguration.maxBufferMs,
+          'bufferForPlaybackMs': bufferingConfiguration.bufferForPlaybackMs,
+          'bufferForPlaybackAfterRebufferMs':
+              bufferingConfiguration.bufferForPlaybackAfterRebufferMs,
+        },
+      );
+
+      response = responseLinkedHashMap != null
+          ? Map<String, dynamic>.from(responseLinkedHashMap)
+          : null;
+    }
     return response?['textureId'] as int?;
   }
 
@@ -69,6 +90,7 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'useCache': dataSource.useCache,
           'maxCacheSize': dataSource.maxCacheSize,
           'maxCacheFileSize': dataSource.maxCacheFileSize,
+          'cacheKey': dataSource.cacheKey,
           'showNotification': dataSource.showNotification,
           'title': dataSource.title,
           'author': dataSource.author,
@@ -76,8 +98,9 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
           'notificationChannelName': dataSource.notificationChannelName,
           'overriddenDuration': dataSource.overriddenDuration?.inMilliseconds,
           'licenseUrl': dataSource.licenseUrl,
+          'certificateUrl': dataSource.certificateUrl,
           'drmHeaders': dataSource.drmHeaders,
-          'activityName': dataSource.activityName
+          'activityName': dataSource.activityName,
         };
         break;
       case DataSourceType.file:
@@ -275,10 +298,12 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
     final Map<String, dynamic> dataSourceDescription = <String, dynamic>{
       'key': dataSource.key,
       'uri': dataSource.uri,
+      'certificateUrl': dataSource.certificateUrl,
       'headers': dataSource.headers,
       'maxCacheSize': dataSource.maxCacheSize,
       'maxCacheFileSize': dataSource.maxCacheFileSize,
-      'preCacheSize': preCacheSize
+      'preCacheSize': preCacheSize,
+      'cacheKey': dataSource.cacheKey,
     };
     return _channel.invokeMethod<void>(
       'preCache',
@@ -401,7 +426,15 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
 
   @override
   Widget buildView(int? textureId) {
-    return Texture(textureId: textureId!);
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      return UiKitView(
+        viewType: 'com.jhomlala/better_player',
+        creationParamsCodec: const StandardMessageCodec(),
+        creationParams: {'textureId': textureId!},
+      );
+    } else {
+      return Texture(textureId: textureId!);
+    }
   }
 
   EventChannel _eventChannelFor(int? textureId) {

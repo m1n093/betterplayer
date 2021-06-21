@@ -15,6 +15,9 @@ import android.util.LongSparseArray;
 
 import androidx.annotation.NonNull;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import io.flutter.embedding.engine.loader.FlutterLoader;
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
@@ -26,9 +29,6 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.view.TextureRegistry;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Android platform implementation of the VideoPlayerPlugin.
@@ -73,6 +73,11 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
     public static final String HEADER_PARAMETER = "header_";
     public static final String FILE_PATH_PARAMETER = "filePath";
     public static final String ACTIVITY_NAME_PARAMETER = "activityName";
+    public static final String MIN_BUFFER_MS = "minBufferMs";
+    public static final String MAX_BUFFER_MS = "maxBufferMs";
+    public static final String BUFFER_FOR_PLAYBACK_MS = "bufferForPlaybackMs";
+    public static final String BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = "bufferForPlaybackAfterRebufferMs";
+    public static final String CACHE_KEY_PARAMETER = "cacheKey";
 
 
     private static final String INIT_METHOD = "init";
@@ -146,7 +151,6 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
             return;
         }
 
-
         switch (call.method) {
             case INIT_METHOD:
                 disposeAllPlayers();
@@ -158,9 +162,22 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                 EventChannel eventChannel =
                         new EventChannel(
                                 flutterState.binaryMessenger, EVENTS_CHANNEL + handle.id());
+                CustomDefaultLoadControl customDefaultLoadControl = null;
+                if (call.hasArgument(MIN_BUFFER_MS) && call.hasArgument(MAX_BUFFER_MS) &&
+                        call.hasArgument(BUFFER_FOR_PLAYBACK_MS) &&
+                        call.hasArgument(BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)) {
+
+                    customDefaultLoadControl =
+                            new CustomDefaultLoadControl(call.argument(MIN_BUFFER_MS),
+                                    call.argument(MAX_BUFFER_MS),
+                                    call.argument(BUFFER_FOR_PLAYBACK_MS),
+                                    call.argument(BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS)
+                            );
+                }
 
                 BetterPlayer player =
-                        new BetterPlayer(flutterState.applicationContext, eventChannel, handle, result);
+                        new BetterPlayer(flutterState.applicationContext, eventChannel, handle,
+                                customDefaultLoadControl, result);
 
                 videoPlayers.put(handle.id(), player);
                 break;
@@ -300,7 +317,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                     0L,
                     overriddenDuration.longValue(),
                     null,
-                    null
+                    null, null
             );
         } else {
             boolean useCache = getParameter(dataSource, USE_CACHE_PARAMETER, false);
@@ -309,6 +326,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
             long maxCacheSize = maxCacheSizeNumber.longValue();
             long maxCacheFileSize = maxCacheFileSizeNumber.longValue();
             String uri = getParameter(dataSource, URI_PARAMETER, "");
+            String cacheKey = getParameter(dataSource, CACHE_KEY_PARAMETER, null);
             String formatHint = getParameter(dataSource, FORMAT_HINT_PARAMETER, null);
             String licenseUrl = getParameter(dataSource, LICENSE_URL_PARAMETER, null);
             Map<String, String> drmHeaders = getParameter(dataSource, DRM_HEADERS_PARAMETER, new HashMap<>());
@@ -324,7 +342,8 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                     maxCacheFileSize,
                     overriddenDuration.longValue(),
                     licenseUrl,
-                    drmHeaders
+                    drmHeaders,
+                    cacheKey
             );
         }
     }
@@ -345,6 +364,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
             Number preCacheSizeNumber = getParameter(dataSource, PRE_CACHE_SIZE_PARAMETER, 3 * 1024 * 1024);
             long preCacheSize = preCacheSizeNumber.longValue();
             String uri = getParameter(dataSource, URI_PARAMETER, "");
+            String cacheKey = getParameter(dataSource, CACHE_KEY_PARAMETER, null);
             Map<String, String> headers = getParameter(dataSource, HEADERS_PARAMETER, new HashMap<>());
 
             BetterPlayer.preCache(flutterState.applicationContext,
@@ -353,6 +373,7 @@ public class BetterPlayerPlugin implements FlutterPlugin, ActivityAware, MethodC
                     maxCacheSize,
                     maxCacheFileSize,
                     headers,
+                    cacheKey,
                     result
             );
         }
