@@ -25,6 +25,16 @@ class MyApp extends StatelessWidget {
           theme: ThemeData(
             primarySwatch: Colors.green,
             accentColor: Colors.green,
+            appBarTheme: AppBarTheme(
+                backwardsCompatibility: false,
+                systemOverlayStyle: SystemUiOverlayStyle.dark
+                    .copyWith(
+                    systemNavigationBarColor: Colors.red,
+                    statusBarColor: Colors.transparent,
+                    statusBarBrightness: Brightness.dark,
+                    statusBarIconBrightness: Brightness.light);,
+                color: Colors.transparent,
+                shadowColor: Colors.transparent),
           ),
           home: WelcomePage(),
         ));
