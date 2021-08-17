@@ -112,6 +112,11 @@ class _BetterPlayerState extends State<BetterPlayer>
     if (_isFullScreen) {
       Wakelock.disable();
       _navigatorState.maybePop();
+      SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.dark.copyWith(
+          systemNavigationBarColor: Colors.red,
+          statusBarColor: Colors.transparent,
+          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: Brightness.light));
       SystemChrome.setEnabledSystemUIOverlays(
           _betterPlayerConfiguration.systemOverlaysAfterFullScreen);
       SystemChrome.setPreferredOrientations(
