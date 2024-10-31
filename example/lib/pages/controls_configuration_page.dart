@@ -1,5 +1,5 @@
 import 'package:better_player/better_player.dart';
-import 'package:better_player_example/constants.dart';
+import 'package:example/constants.dart';
 import 'package:flutter/material.dart';
 
 class ControlsConfigurationPage extends StatefulWidget {
@@ -61,6 +61,17 @@ class _ControlsConfigurationPageState extends State<ControlsConfigurationPage> {
             aspectRatio: 16 / 9,
             child: BetterPlayer(controller: _betterPlayerController),
           ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _betterPlayerController.setBetterPlayerControlsConfiguration(
+                  BetterPlayerControlsConfiguration(
+                      overflowModalColor: Colors.amberAccent),
+                );
+              });
+            },
+            child: Text("Reset settings"),
+          )
         ],
       ),
     );
